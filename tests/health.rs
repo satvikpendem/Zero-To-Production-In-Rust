@@ -54,6 +54,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     pool
 }
 
+/// Cleans up Postgres from databases created during testing
 pub async fn clean_up_database(name: String) {
     let connection = PgPool::connect(
         &configuration::get()
@@ -79,13 +80,6 @@ pub async fn clean_up_database(name: String) {
         .execute(format!(r#"DROP DATABASE "{}";"#, name).as_str())
         .await
         .expect("Failed to drop database");
-
-    // Run shell cleanup script just in case a test panics
-    Command::new("sh")
-        .arg("-C")
-        .arg("scripts/clean_db.sh")
-        .spawn()
-        .expect("sh command failed to start");
 }
 
 #[tokio::test]
@@ -106,10 +100,11 @@ async fn health() {
         .await
         .expect("Failed to execute request.");
 
+    // Clean up database *first* before `assert`ing which might cause a panic
+    clean_up_database(database_name).await;
+
     assert!(response.status().is_success());
     assert_eq!(Some(0), response.content_length());
-
-    clean_up_database(database_name).await;
 }
 
 #[tokio::test]
@@ -139,19 +134,14 @@ async fn subscribe_returns_200_for_valid_form_data() {
         .await
         .expect("Failed to fetch saved subscription.");
 
+    clean_up_database(database_name).await;
+
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
-
-    clean_up_database(database_name).await;
 }
 
 #[tokio::test]
 async fn subscribe_returns_400_when_data_is_missing() {
-    let TestApp {
-        address,
-        database_pool: _,
-        database_name,
-    } = spawn_app().await;
     let client = reqwest::Client::new();
     let test_cases = vec![
         ("name=le%guin", "missing email"),
@@ -159,9 +149,14 @@ async fn subscribe_returns_400_when_data_is_missing() {
         ("", "missing name and email"),
     ];
 
-    let url = format!("{address}/subscriptions");
-
     for (body, error_message) in test_cases {
+        let TestApp {
+            address,
+            database_pool: _,
+            database_name,
+        } = spawn_app().await;
+
+        let url = format!("{address}/subscriptions");
         let response = client
             .post(&url)
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -170,12 +165,12 @@ async fn subscribe_returns_400_when_data_is_missing() {
             .await
             .expect("Failed to execute request.");
 
+        clean_up_database(database_name).await;
+
         assert_eq!(
             400,
             response.status().as_u16(),
             "The API did not fail with `400 Bad Request` when the payload was `{error_message}`"
         );
     }
-
-    clean_up_database(database_name).await;
 }
