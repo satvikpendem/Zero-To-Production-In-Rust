@@ -1,4 +1,4 @@
-use std::net::TcpListener;
+use std::{net::TcpListener, process::Command};
 
 use sqlx::{Executor, PgPool};
 use uuid::Uuid;
@@ -79,6 +79,13 @@ pub async fn clean_up_database(name: String) {
         .execute(format!(r#"DROP DATABASE "{}";"#, name).as_str())
         .await
         .expect("Failed to drop database");
+
+    // Run shell cleanup script just in case a test panics
+    Command::new("sh")
+        .arg("-C")
+        .arg("scripts/clean_db.sh")
+        .spawn()
+        .expect("sh command failed to start");
 }
 
 #[tokio::test]
