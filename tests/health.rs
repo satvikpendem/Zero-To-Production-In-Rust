@@ -65,6 +65,7 @@ pub async fn clean_up_database(name: String) {
     .await
     .expect("Failed to connect to Postgres");
 
+    // Disconnect from database before dropping
     connection
         .execute(
             format!(
@@ -76,6 +77,7 @@ pub async fn clean_up_database(name: String) {
         .await
         .expect("Failed to terminate database connection");
 
+    // Drop database
     connection
         .execute(format!(r#"DROP DATABASE "{}";"#, name).as_str())
         .await
