@@ -2392,6 +2392,7 @@ dependencies = [
  "chrono",
  "config",
  "reqwest",
+ "scopeguard",
  "serde",
  "sqlx",
  "tokio",

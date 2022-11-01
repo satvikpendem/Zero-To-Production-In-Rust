@@ -6,8 +6,8 @@ deny = [
 warn = [
     "clippy::pedantic",
     "clippy::nursery",
-    "clippy::unwrap_used",
-    "clippy::expect_used",
+    # "clippy::unwrap_used",
+    # "clippy::expect_used",
 ]
 allow = [
     "clippy::missing_errors_doc",

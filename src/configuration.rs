@@ -13,7 +13,7 @@ pub struct DatabaseSettings {
     pub password: String,
     pub port: u16,
     pub host: String,
-    pub database_name: String,
+    pub name: String,
 }
 
 pub fn get() -> Result<Settings, ConfigError> {
@@ -30,8 +30,15 @@ impl DatabaseSettings {
             password,
             host,
             port,
-            database_name,
+            name,
         } = self;
-        format!("postgres://{username}:{password}@{host}:{port}/{database_name}")
+        format!("postgres://{username}:{password}@{host}:{port}/{name}")
+    }
+
+    pub fn connection_string_without_db(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}:{}",
+            self.username, self.password, self.host, self.port
+        )
     }
 }

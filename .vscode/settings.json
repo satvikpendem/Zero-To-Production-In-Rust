@@ -7,7 +7,7 @@
             "driver": "PostgreSQL",
             "name": "zero2prod",
             "database": "newsletter",
-            "username": "api",
+            "username": "newsletter",
             "password": "postgres"
         }
     ]

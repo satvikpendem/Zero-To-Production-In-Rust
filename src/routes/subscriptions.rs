@@ -13,6 +13,9 @@ pub struct FormData {
     name: String,
 }
 
+/// Subscribe someone to the newsletter
+/// # Panics
+/// When the database cannot be found or connected to
 pub async fn subscribe(form: Form<FormData>, connection: Data<PgPool>) -> HttpResponse {
     if let Err(e) = query!(
         r#"
