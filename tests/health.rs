@@ -1,4 +1,4 @@
-use std::{net::TcpListener, process::Command};
+use std::net::TcpListener;
 
 use sqlx::{Executor, PgPool};
 use uuid::Uuid;
