@@ -14,7 +14,7 @@ async fn main() -> std::io::Result<()> {
     init_subscriber(subscriber);
 
     let configuration = configuration::get().expect("Unable to read configuration");
-    let address = TcpListener::bind("127.0.0.1:8000")?;
+    let address = TcpListener::bind("127.0.0.1:8080")?;
     let connection_pool =
         PgPool::connect(configuration.database.connection_string().expose_secret())
             .await
