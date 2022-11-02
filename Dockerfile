@@ -3,8 +3,10 @@ FROM ubuntu
 
 WORKDIR /app
 
+ENV ENVIRONMENT production
+
 COPY ./target/release/zero2prod .
-COPY ./configuration.yaml .
+COPY ./configuration ./configuration
 
 ENTRYPOINT ["./zero2prod"]
 EXPOSE 8080

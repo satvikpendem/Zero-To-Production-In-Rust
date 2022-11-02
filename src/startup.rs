@@ -9,7 +9,10 @@ use sqlx::PgPool;
 use tracing::info;
 use tracing_actix_web::TracingLogger;
 
-use crate::routes::{health::health, subscriptions::subscribe};
+use crate::{
+    configuration,
+    routes::{health::health, subscriptions::subscribe},
+};
 
 pub fn run(listener: TcpListener, connection_pool: PgPool) -> std::io::Result<Server> {
     let pool = Data::new(connection_pool);
@@ -22,6 +25,12 @@ pub fn run(listener: TcpListener, connection_pool: PgPool) -> std::io::Result<Se
     })
     .listen(listener)?
     .run();
-    info!("Starting on localhost:8000");
+
+    let config = configuration::get().expect("Failed to read configuration.");
+    info!(
+        "Starting on {}:{}",
+        config.application.host, config.application.port,
+    );
+
     Ok(server)
 }
