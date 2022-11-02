@@ -25,6 +25,7 @@ pub fn get() -> Result<Settings, ConfigError> {
 }
 
 impl DatabaseSettings {
+    #[must_use]
     pub fn connection_string(&self) -> Secret<String> {
         let Self {
             username,
@@ -39,6 +40,7 @@ impl DatabaseSettings {
         ))
     }
 
+    #[must_use]
     pub fn connection_string_without_db(&self) -> Secret<String> {
         Secret::new(format!(
             "postgres://{}:{}@{}:{}",
