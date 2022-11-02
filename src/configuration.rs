@@ -1,4 +1,5 @@
 use config::{Config, ConfigError, File, FileFormat};
+use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -10,7 +11,7 @@ pub struct Settings {
 #[derive(Deserialize)]
 pub struct DatabaseSettings {
     pub username: String,
-    pub password: String,
+    pub password: Secret<String>,
     pub port: u16,
     pub host: String,
     pub name: String,
@@ -24,7 +25,7 @@ pub fn get() -> Result<Settings, ConfigError> {
 }
 
 impl DatabaseSettings {
-    pub fn connection_string(&self) -> String {
+    pub fn connection_string(&self) -> Secret<String> {
         let Self {
             username,
             password,
@@ -32,13 +33,19 @@ impl DatabaseSettings {
             port,
             name,
         } = self;
-        format!("postgres://{username}:{password}@{host}:{port}/{name}")
+        Secret::new(format!(
+            "postgres://{username}:{}@{host}:{port}/{name}",
+            password.expose_secret()
+        ))
     }
 
-    pub fn connection_string_without_db(&self) -> String {
-        format!(
+    pub fn connection_string_without_db(&self) -> Secret<String> {
+        Secret::new(format!(
             "postgres://{}:{}@{}:{}",
-            self.username, self.password, self.host, self.port
-        )
+            self.username,
+            self.password.expose_secret(),
+            self.host,
+            self.port
+        ))
     }
 }

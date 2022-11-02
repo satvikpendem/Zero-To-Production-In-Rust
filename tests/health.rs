@@ -1,13 +1,31 @@
-use std::net::TcpListener;
+use std::{
+    io::{sink, stdout},
+    net::TcpListener,
+};
 
+use once_cell::sync::Lazy;
+use secrecy::ExposeSecret;
 use sqlx::{Executor, PgPool};
 use uuid::Uuid;
 use zero2prod::{
     configuration::{self, DatabaseSettings},
     startup::run,
+    telemetry::{get_subscriber, init_subscriber},
 };
 
-#[derive(Clone)]
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let subscriber_name = "test".to_string();
+    let default_filter_level = "info".to_string();
+
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, stdout);
+        init_subscriber(subscriber);
+    } else {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, sink);
+        init_subscriber(subscriber);
+    }
+});
+
 pub struct TestApp {
     pub address: String,
     pub database_pool: PgPool,
@@ -15,6 +33,8 @@ pub struct TestApp {
 }
 
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{port}");
@@ -33,7 +53,7 @@ async fn spawn_app() -> TestApp {
 }
 
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let connection = PgPool::connect(&config.connection_string_without_db())
+    let connection = PgPool::connect(config.connection_string_without_db().expose_secret())
         .await
         .expect("Failed to connect to Postgres");
 
@@ -42,7 +62,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Failed to create database");
 
-    let pool = PgPool::connect(&config.connection_string())
+    let pool = PgPool::connect(config.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres.");
 
@@ -57,10 +77,11 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
 /// Cleans up Postgres from databases created during testing
 pub async fn clean_up_database(name: String) {
     let connection = PgPool::connect(
-        &configuration::get()
+        configuration::get()
             .expect("Failed to get configuration")
             .database
-            .connection_string_without_db(),
+            .connection_string_without_db()
+            .expose_secret(),
     )
     .await
     .expect("Failed to connect to Postgres");
@@ -122,7 +143,7 @@ async fn subscribe_returns_200_for_valid_form_data() {
 
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = client
-        .post(url)
+        .post(&url)
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send()
@@ -175,4 +196,41 @@ async fn subscribe_returns_400_when_data_is_missing() {
             "The API did not fail with `400 Bad Request` when the payload was `{error_message}`"
         );
     }
+}
+
+#[tokio::test]
+async fn subscribe_returns_500_when_email_already_exists() {
+    let TestApp {
+        address,
+        database_pool: _,
+        database_name,
+    } = spawn_app().await;
+
+    let client = reqwest::Client::new();
+    let url = format!("{address}/subscriptions");
+
+    // Send first request with form data
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    assert_eq!(200, response.status().as_u16());
+
+    // Send second request with duplicate form data
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    clean_up_database(database_name).await;
+
+    assert_eq!(500, response.status().as_u16());
 }
