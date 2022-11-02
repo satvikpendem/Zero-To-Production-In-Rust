@@ -1,0 +1,7 @@
+FROM ubuntu
+WORKDIR /app
+ENV ENVIRONMENT production
+COPY ./target/debug/zero2prod .
+COPY ./configuration ./configuration
+ENTRYPOINT ["./zero2prod"]
+EXPOSE 8080
