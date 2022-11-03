@@ -1,1 +1,12 @@
-/target
+/target/debug
+/target/nextest
+/target/release/.fingerprint
+/target/release/build
+/target/release/deps
+/target/release/examples
+/target/release/incremental
+/target/release/*.d
+/target/release/.cargo-lock
+/target/release/*.rlib
+/target/.rustc_info.json
+/target/*.TAG
