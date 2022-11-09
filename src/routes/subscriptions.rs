@@ -28,7 +28,7 @@ pub async fn subscribe(form: Form<FormData>, pool: Data<PgPool>) -> HttpResponse
     if (insert_subscriber(&form, &pool).await).is_ok() {
         HttpResponse::Ok().finish()
     } else {
-        HttpResponse::InternalServerError().body("Email already exists")
+        HttpResponse::InternalServerError().body("Database Error")
     }
 }
 

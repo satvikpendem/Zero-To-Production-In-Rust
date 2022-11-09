@@ -9,9 +9,12 @@ RUN apt-get update -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
 
+# ENVIRONMENT equaling `production` is required for sqlx to run offline and migrate properly
 ENV ENVIRONMENT production
 COPY ./target/release/zero2prod .
+# Configuration files are copied over but will be overwritten by environment variables injected from the PaaS or server
 COPY ./configuration ./configuration
+COPY ./migrations ./migrations
 ENTRYPOINT ["./zero2prod"]
 EXPOSE 8080
 
