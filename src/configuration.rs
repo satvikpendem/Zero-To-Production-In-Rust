@@ -58,10 +58,14 @@ pub fn get() -> Result<Settings, ConfigError> {
     let environment_filename = format!("{}.yaml", environment.as_str());
 
     let settings = Config::builder()
+        // configuration/base.yaml
         .add_source(File::from(configuration_directory.join("base.yaml")))
+        // merge with configuration/development.yaml or configuration/production.yaml
         .add_source(File::from(
             configuration_directory.join(&environment_filename),
         ))
+        // environment variables that are injected from the PaaS or server when deployed
+        .add_source(config::Environment::default())
         .build()?;
     settings.try_deserialize::<Settings>()
 }

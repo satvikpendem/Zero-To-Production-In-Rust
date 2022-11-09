@@ -2,7 +2,7 @@ version: '3'
 
 services:
   database:
-    image: postgres
+    image: postgres:alpine
     environment:
       POSTGRES_USER: newsletter
       POSTGRES_PASSWORD: postgres
