@@ -46,6 +46,7 @@ features = [
 reqwest = "0.11"
 
 [package.metadata.commands]
+clean = "./scripts/clean_database.sh newsletter"
 dev = "cargo watch -x 'nextest run' -x 'run | bunyan'"
 prod = "cargo watch -x 'nextest run' -x 'build --release --target-dir ../target && ./target/release/zero2prod | bunyan'"
 docker-build = "cargo watch -x 'nextest run' -s './scripts/build.sh'"
