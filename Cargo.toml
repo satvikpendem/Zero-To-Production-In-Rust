@@ -28,6 +28,8 @@ tracing-bunyan-formatter = "0.3"
 tracing-log = "0.1.3"
 tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
 uuid = { version = "1", features = ["v4"] }
+unicode-segmentation = "1.10.0"
+claim = "0.5.0"
 
 [dependencies.sqlx]
 version = "0.6"
@@ -47,8 +49,9 @@ reqwest = "0.11"
 
 [package.metadata.commands]
 clean = "./scripts/clean_database.sh newsletter"
-dev = "cargo watch -x 'nextest run' -x 'run | bunyan'"
-prod = "cargo watch -x 'nextest run' -x 'build --release --target-dir ../target && ./target/release/zero2prod | bunyan'"
-docker-build = "cargo watch -x 'nextest run' -s './scripts/build.sh'"
-docker-dev = "cargo watch -x 'nextest run' -s './scripts/run.sh'"
-docker-prod = "cargo watch -x 'nextest run' -s './scripts/run.sh release'"
+test = "cargo nextest run --failure-output final"
+dev = "cargo watch -x 'cmd test' -x 'cmd clean' -x 'run | bunyan'"
+prod = "cargo watch -x 'cmd test' -x 'cmd clean' -x 'build --release --target-dir ../target && ./target/release/zero2prod | bunyan'"
+docker-build = "cargo watch -x 'cmd test' -x 'cmd clean' -s './scripts/build.sh'"
+docker-dev = "cargo watch -x 'cmd test' -x 'cmd clean' -s './scripts/run.sh'"
+docker-prod = "cargo watch -x 'cmd test' -x 'cmd clean' -s './scripts/run.sh release'"
