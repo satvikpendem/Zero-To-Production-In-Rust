@@ -67,6 +67,7 @@ pub fn get() -> Result<Settings, ConfigError> {
         // environment variables that are injected from the PaaS or server when deployed
         .add_source(config::Environment::default())
         .build()?;
+
     settings.try_deserialize::<Settings>()
 }
 

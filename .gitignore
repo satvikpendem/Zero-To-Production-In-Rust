@@ -10,3 +10,5 @@
 /target/release/*.rlib
 /target/.rustc_info.json
 /target/*.TAG
+
+.env
