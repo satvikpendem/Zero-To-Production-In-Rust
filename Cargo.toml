@@ -55,7 +55,7 @@ quickcheck_macros = "1"
 
 [package.metadata.commands]
 # Check whether database is down and restart if so, needed for tests and general app function
-database = "if sudo service postgresql status | rg down; then sudo service postgresql restart; fi"
+database = "./scripts/start_database.sh"
 # Before running tests, restart the database if down
 test = "cargo cmd database && cargo nextest run --failure-output final"
 # Clean Postgres from temporary databases that are made by test runs
