@@ -52,6 +52,7 @@ validator = "0"
 fake = "2"
 quickcheck = "1"
 quickcheck_macros = "1"
+wiremock = "0.5.15"
 
 [package.metadata.commands]
 # Check whether database is down and restart if so, needed for tests and general app function

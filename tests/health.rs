@@ -41,18 +41,22 @@ async fn spawn_app() -> TestApp {
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{port}");
 
-    let mut config = configuration::get().expect("Failed to read configuration.");
+    let mut configuration = configuration::get().expect("Failed to read configuration.");
 
     // Database
-    config.database.name = Uuid::new_v4().to_string();
-    let database_pool = configure_database(&config.database).await;
+    configuration.database.name = Uuid::new_v4().to_string();
+    let database_pool = configure_database(&configuration.database).await;
 
     // Email Client
-    let sender_email = config
+    let sender_email = configuration
         .email_client
         .sender()
         .expect("Invalid sender email address");
-    let email_client = EmailClient::new(config.email_client.base_url, sender_email);
+    let email_client = EmailClient::new(
+        configuration.email_client.base_url,
+        sender_email,
+        configuration.email_client.authorization_token,
+    );
 
     let server =
         run(listener, database_pool.clone(), email_client).expect("Failed to bind address");
@@ -60,7 +64,7 @@ async fn spawn_app() -> TestApp {
     TestApp {
         address,
         database_pool,
-        database_name: config.database.name,
+        database_name: configuration.database.name,
     }
 }
 
