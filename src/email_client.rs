@@ -1,6 +1,7 @@
+use std::time::Duration;
+
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
-// use serde::{Deserialize, Serialize};
 
 use crate::domain::SubscriberEmail;
 use crate::sendgrid_email_format::{
@@ -15,25 +16,19 @@ pub struct EmailClient {
     authorization_token: Secret<String>,
 }
 
-// #[derive(Serialize)]
-// struct SendEmailRequest {
-//     from: String,
-//     to: String,
-//     subject: String,
-//     content: String,
-// }
-
 impl EmailClient {
     #[must_use]
     pub fn new(
         base_url: String,
         sender: SubscriberEmail,
         authorization_token: Secret<String>,
+        timeout: Duration,
     ) -> Self {
+        let http_client = Client::builder().timeout(timeout).build().unwrap();
         Self {
-            http_client: Client::new(),
-            base_url,
             sender,
+            http_client,
+            base_url,
             authorization_token,
         }
     }
@@ -49,16 +44,16 @@ impl EmailClient {
         let request_body = SendgridEmailFormat {
             personalizations: vec![PersonalizationField {
                 to: vec![ToField {
-                    email: recipient.as_ref().to_string(),
+                    email: recipient.as_ref(),
                 }],
             }],
             from: FromField {
-                email: "satvik@darkmodes.com".to_string(),
+                email: "satvik@darkmodes.com",
             },
-            subject: subject.to_string(),
+            subject,
             content: vec![ContentField {
-                type_field: "text/plain".to_string(),
-                value: text_content.to_string(),
+                type_field: "text/plain",
+                value: text_content,
             }],
         };
         let builder = self
@@ -68,14 +63,18 @@ impl EmailClient {
             .header("Content-Type", "application/json")
             .json(&request_body)
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::{domain::SubscriberEmail, email_client::EmailClient};
+    use claim::{assert_err, assert_ok};
     use fake::{
         faker::{
             internet::en::SafeEmail,
@@ -84,31 +83,135 @@ mod tests {
         Fake, Faker,
     };
     use secrecy::Secret;
-    use wiremock::{matchers::header_exists, Mock, MockServer, ResponseTemplate};
+    use wiremock::{
+        matchers::{any, header, header_exists, method, path},
+        Match, Mock, MockServer, Request, ResponseTemplate,
+    };
+
+    struct SendEmailBodyMatcher;
+
+    impl Match for SendEmailBodyMatcher {
+        fn matches(&self, request: &Request) -> bool {
+            let result: Result<serde_json::Value, _> = serde_json::from_slice(&request.body);
+
+            dbg!(&request.body);
+            dbg!(&result);
+
+            result.map_or(false, |body| {
+                // [SendgridEmailFormat]
+                body.get("personalizations").is_some()
+                    && body.get("from").is_some()
+                    && body.get("subject").is_some()
+                    && body.get("content").is_some()
+            })
+        }
+    }
+
+    fn subject() -> String {
+        Sentence(1..2).fake()
+    }
+
+    fn content() -> String {
+        Paragraph(1..10).fake()
+    }
+
+    fn email() -> SubscriberEmail {
+        SubscriberEmail::parse(SafeEmail().fake()).unwrap()
+    }
+
+    fn email_client(base_url: String) -> EmailClient {
+        EmailClient::new(
+            base_url,
+            email(),
+            Secret::new(Faker.fake()),
+            Duration::from_millis(200),
+        )
+    }
 
     #[tokio::test]
-    async fn send_email_fires_a_request_to_base_url() {
+    async fn send_email_sends_the_expected_request() {
         // Arrange
         let mock_server = MockServer::start().await;
-        let sender_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
-        let email_client =
-            EmailClient::new(mock_server.uri(), sender_email, Secret::new(Faker.fake()));
+        let email_client = email_client(mock_server.uri());
 
         Mock::given(header_exists("Authorization"))
+            .and(header("Content-Type", "application/json"))
+            .and(path("/email"))
+            .and(method("POST"))
+            .and(SendEmailBodyMatcher)
             .respond_with(ResponseTemplate::new(200))
             .expect(1)
             .mount(&mock_server)
             .await;
 
-        let subscriber_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
-        let subject: String = Sentence(1..2).fake();
-        let content: String = Paragraph(1..10).fake();
-
         // Act
         let _ = email_client
-            .send_email(subscriber_email, &subject, &content, &content)
+            .send_email(email(), &subject(), &content(), &content())
             .await;
 
         // Assert
+        // Checked on Drop
+    }
+
+    #[tokio::test]
+    async fn send_email_succeeds_if_server_returns_200() {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let email_client = email_client(mock_server.uri());
+
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(200))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        // Act
+        let outcome = email_client
+            .send_email(email(), &subject(), &content(), &content())
+            .await;
+
+        // Assert
+        assert_ok!(outcome);
+    }
+
+    #[tokio::test]
+    async fn send_email_fails_if_server_returns_500() {
+        let mock_server = MockServer::start().await;
+        let email_client = email_client(mock_server.uri());
+
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(500))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let outcome = email_client
+            .send_email(email(), &subject(), &content(), &content())
+            .await;
+
+        assert_err!(outcome);
+    }
+
+    #[tokio::test]
+    async fn send_email_times_out_if_server_takes_too_long_to_respond() {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let email_client = email_client(mock_server.uri());
+
+        let response = ResponseTemplate::new(200).set_delay(Duration::from_secs(180));
+
+        Mock::given(any())
+            .respond_with(response)
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        // Act
+        let outcome = email_client
+            .send_email(email(), &subject(), &content(), &content())
+            .await;
+
+        // Assert
+        assert_err!(outcome);
     }
 }
