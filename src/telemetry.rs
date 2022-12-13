@@ -9,7 +9,7 @@ use tracing_subscriber::{
 ///
 /// # Implementation Notes
 ///
-/// We are using `impl Subscriber` as return type to avoid having to
+/// We are using `impl Subscriber` as the return type to avoid having to
 /// spell out the actual type of the returned subscriber, which is
 /// indeed quite complex.
 pub fn get_subscriber<Sink>(

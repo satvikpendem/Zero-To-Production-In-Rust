@@ -10,13 +10,17 @@ use crate::sendgrid_email_format::{
 
 #[derive(Clone)]
 pub struct EmailClient {
-    sender: SubscriberEmail,
+    _sender: SubscriberEmail,
     http_client: Client,
     base_url: String,
     authorization_token: Secret<String>,
 }
 
 impl EmailClient {
+    /// # Panics
+    ///
+    /// This method fails if a TLS backend cannot be initialized,
+    /// or the resolver cannot load the system configuration.
     #[must_use]
     pub fn new(
         base_url: String,
@@ -26,7 +30,7 @@ impl EmailClient {
     ) -> Self {
         let http_client = Client::builder().timeout(timeout).build().unwrap();
         Self {
-            sender,
+            _sender: sender,
             http_client,
             base_url,
             authorization_token,
@@ -37,7 +41,7 @@ impl EmailClient {
         &self,
         recipient: SubscriberEmail,
         subject: &str,
-        html_content: &str,
+        _html_content: &str,
         text_content: &str,
     ) -> Result<(), reqwest::Error> {
         let url = format!("{}/email", self.base_url);
@@ -56,7 +60,7 @@ impl EmailClient {
                 value: text_content,
             }],
         };
-        let builder = self
+        let _builder = self
             .http_client
             .post(&url)
             .bearer_auth(self.authorization_token.expose_secret())
@@ -145,7 +149,7 @@ mod tests {
             .await;
 
         // Act
-        let _ = email_client
+        let _sent_email = email_client
             .send_email(email(), &subject(), &content(), &content())
             .await;
 
