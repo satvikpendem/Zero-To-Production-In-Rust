@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use reqwest::Response;
 use secrecy::ExposeSecret;
 use sqlx::{Executor, PgPool};
 use std::io::{sink, stdout};
@@ -26,6 +27,18 @@ pub struct TestApp {
     pub address: String,
     pub database_pool: PgPool,
     pub database_name: String,
+}
+
+impl TestApp {
+    pub async fn post_subscriptions(&self, body: String) -> Response {
+        reqwest::Client::new()
+            .post(format!("{}/subscriptions", &self.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
 }
 
 pub async fn spawn_app() -> TestApp {
