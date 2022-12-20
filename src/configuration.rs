@@ -67,7 +67,7 @@ pub fn get() -> Result<Settings, ConfigError> {
         .add_source(File::from(configuration_directory.join("base.yaml")))
         // merge with configuration/development.yaml or configuration/production.yaml
         .add_source(File::from(
-            configuration_directory.join(&environment_filename),
+            configuration_directory.join(environment_filename),
         ))
         // environment variables that are injected from the PaaS or server when deployed
         .add_source(config::Environment::default())
