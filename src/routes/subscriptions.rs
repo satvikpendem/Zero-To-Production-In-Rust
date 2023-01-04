@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::{
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
     email_client::EmailClient,
+    startup::ApplicationBaseUrl,
 };
 
 #[derive(Deserialize)]
@@ -33,7 +34,7 @@ impl TryFrom<FormData> for NewSubscriber {
 /// When the database cannot be found or connected to
 #[tracing::instrument(
     name = "Adding new subscriber",
-    skip(form, pool, email_client),
+    skip(form, pool, email_client, base_url),
     fields(
         subscriber_email = %form.email,
         subscriber_name = %form.name
@@ -43,6 +44,7 @@ pub async fn subscribe(
     form: Form<FormData>,
     pool: Data<PgPool>,
     email_client: Data<EmailClient>,
+    base_url: Data<ApplicationBaseUrl>,
 ) -> HttpResponse {
     let Ok(subscriber) = form.0.try_into() else {
         return HttpResponse::BadRequest().finish()
@@ -52,7 +54,7 @@ pub async fn subscribe(
         return HttpResponse::InternalServerError().finish();
     }
 
-    if send_confirmation_email(&email_client, subscriber)
+    if send_confirmation_email(&email_client, subscriber, base_url.0.to_string())
         .await
         .is_err()
     {
@@ -73,7 +75,7 @@ pub async fn insert_subscriber(
     query!(
         r#"
             INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-            VALUES ($1, $2, $3, $4, 'confirmed')
+            VALUES ($1, $2, $3, $4, 'pending_confirmation')
         "#,
         Uuid::new_v4(),
         subscriber.email.as_ref(),
@@ -92,13 +94,14 @@ pub async fn insert_subscriber(
 
 #[tracing::instrument(
     name = "Send a confirmation email to a new subscriber",
-    skip(email_client, subscriber)
+    skip(email_client, subscriber, base_url)
 )]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     subscriber: NewSubscriber,
+    base_url: String,
 ) -> Result<(), reqwest::Error> {
-    let confirmation_link = "https://my-api.com/subscriptions/confirm";
+    let confirmation_link = format!("{base_url}/subscriptions/confirm?subscription_token=mytoken");
 
     let plain_body = format!(
         "Welcome to our newsletter!\nVisit {} to confirm your subscription.",

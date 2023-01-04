@@ -20,9 +20,25 @@ async fn subscribe_returns_200_for_valid_form_data() {
 
     let response = app.post_subscriptions(body.into()).await;
 
-    assert_eq!(200, response.status().as_u16());
+    clean_up_database(app.database_name).await;
 
-    let saved = sqlx::query!("SELECT email, name FROM subscriptions")
+    assert_eq!(200, response.status().as_u16());
+}
+
+#[tokio::test]
+async fn subscribe_persists_the_new_subscriber() {
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    app.post_subscriptions(body.into()).await;
+
+    let saved = sqlx::query!("SELECT email, name, status FROM subscriptions",)
         .fetch_one(&app.database_pool)
         .await
         .expect("Failed to fetch saved subscription.");
@@ -31,6 +47,7 @@ async fn subscribe_returns_200_for_valid_form_data() {
 
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.status, "pending_confirmation");
 }
 
 #[tokio::test]
@@ -148,5 +165,6 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
     let html_link = get_link(body["HtmlBody"].as_str().unwrap());
     let text_link = get_link(body["TextBody"].as_str().unwrap());
 
+    clean_up_database(app.database_name).await;
     assert_eq!(html_link, text_link);
 }

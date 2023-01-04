@@ -13,34 +13,8 @@ use tracing_actix_web::TracingLogger;
 use crate::{
     configuration::{self, DatabaseSettings, Settings},
     email_client::EmailClient,
-    routes::{health::health, subscriptions::subscribe},
+    routes::{health::health, subscriptions::subscribe, subscriptions_confirm::confirm},
 };
-
-pub fn run(
-    listener: TcpListener,
-    connection_pool: PgPool,
-    email_client: EmailClient,
-) -> std::io::Result<Server> {
-    let pool = Data::new(connection_pool);
-    let server = HttpServer::new(move || {
-        App::new()
-            .wrap(TracingLogger::default())
-            .route("/health", web::get().to(health))
-            .route("/subscriptions", web::post().to(subscribe))
-            .app_data(pool.clone())
-            .app_data(email_client.clone())
-    })
-    .listen(listener)?
-    .run();
-
-    let config = configuration::get().expect("Failed to read configuration.");
-    info!(
-        "Starting on {}:{}",
-        config.application.host, config.application.port,
-    );
-
-    Ok(server)
-}
 
 #[must_use]
 pub fn get_connection_pool(database: &DatabaseSettings) -> PgPool {
@@ -86,7 +60,12 @@ impl Application {
         );
         let listener = TcpListener::bind(address)?;
         let port = listener.local_addr().expect("Failed to bind port").port();
-        let server = run(listener, connection_pool, email_client)?;
+        let server = run(
+            listener,
+            connection_pool,
+            email_client,
+            configuration.application.base_url.to_string(),
+        )?;
 
         Ok(Self { port, server })
     }
@@ -101,4 +80,36 @@ impl Application {
     pub async fn run_until_stopped(self) -> Result<(), Error> {
         self.server.await
     }
+}
+
+pub struct ApplicationBaseUrl(pub String);
+
+pub fn run(
+    listener: TcpListener,
+    connection_pool: PgPool,
+    email_client: EmailClient,
+    base_url: String,
+) -> std::io::Result<Server> {
+    let pool = Data::new(connection_pool);
+    let base_url = Data::new(ApplicationBaseUrl(base_url));
+    let server = HttpServer::new(move || {
+        App::new()
+            .wrap(TracingLogger::default())
+            .route("/health", web::get().to(health))
+            .route("/subscriptions", web::post().to(subscribe))
+            .route("subscriptions/confirm", web::get().to(confirm))
+            .app_data(pool.clone())
+            .app_data(email_client.clone())
+            .app_data(base_url.clone())
+    })
+    .listen(listener)?
+    .run();
+
+    let config = configuration::get().expect("Failed to read configuration.");
+    info!(
+        "Starting on {}:{}",
+        config.application.host, config.application.port,
+    );
+
+    Ok(server)
 }
