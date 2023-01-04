@@ -6,6 +6,7 @@ async fn health() {
         address,
         database_pool: _,
         database_name,
+        email_server: _,
     } = spawn_app().await;
 
     let client = reqwest::Client::new();

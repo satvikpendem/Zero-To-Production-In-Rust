@@ -4,6 +4,7 @@ use secrecy::ExposeSecret;
 use sqlx::{Executor, PgPool};
 use std::io::{sink, stdout};
 use uuid::Uuid;
+use wiremock::MockServer;
 use zero2prod::{
     configuration::{self, DatabaseSettings},
     startup::{get_connection_pool, Application},
@@ -27,6 +28,7 @@ pub struct TestApp {
     pub address: String,
     pub database_pool: PgPool,
     pub database_name: String,
+    pub email_server: MockServer,
 }
 
 impl TestApp {
@@ -44,12 +46,15 @@ impl TestApp {
 pub async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
 
+    let email_server = MockServer::start().await;
+
     let configuration = {
         let mut c = configuration::get().expect("Failed to read configuration");
         // Use a different database for each test case
         c.database.name = Uuid::new_v4().to_string();
         // Use a random OS port
         c.application.port = 0;
+        c.email_client.base_url = email_server.uri();
         c
     };
 
@@ -67,6 +72,7 @@ pub async fn spawn_app() -> TestApp {
         address,
         database_pool: get_connection_pool(&configuration.database),
         database_name: configuration.database.name,
+        email_server,
     }
 }
 
@@ -118,7 +124,7 @@ pub async fn clean_up_database(name: String) {
 
     // Drop database
     connection
-        .execute(format!(r#"DROP DATABASE "{}";"#, name).as_str())
+        .execute(format!(r#"DROP DATABASE "{name}";"#).as_str())
         .await
         .expect("Failed to drop database");
 }
