@@ -41,10 +41,6 @@ pub async fn subscribe(form: Form<FormData>, pool: Data<PgPool>) -> HttpResponse
         return HttpResponse::BadRequest().finish()
     };
 
-    // insert_subscriber(&subscriber, &pool)
-    //     .await
-    //     .map_err(|_| HttpResponse::InternalServerError().finish())?;
-
     match insert_subscriber(&subscriber, &pool).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
@@ -61,8 +57,8 @@ pub async fn insert_subscriber(
 ) -> Result<(), sqlx::Error> {
     query!(
         r#"
-            INSERT INTO subscriptions (id, email, name, subscribed_at)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO subscriptions (id, email, name, subscribed_at, status)
+            VALUES ($1, $2, $3, $4, 'confirmed')
         "#,
         Uuid::new_v4(),
         subscriber.email.as_ref(),
