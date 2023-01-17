@@ -1,3 +1,8 @@
+use std::{
+    error::Error,
+    fmt::{Debug, Display, Formatter},
+};
+
 use actix_web::{
     web::{Data, Form},
     HttpResponse,
@@ -27,6 +32,39 @@ impl TryFrom<FormData> for NewSubscriber {
         let name = SubscriberName::parse(form.name)?;
         let email = SubscriberEmail::parse(form.email)?;
         Ok(Self { email, name })
+    }
+}
+
+pub struct StoreTokenError(sqlx::Error);
+
+impl Display for StoreTokenError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "A database error was encountered while trying to store a subscription token."
+        )
+    }
+}
+
+impl Error for StoreTokenError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+fn error_chain_fmt(e: &impl Error, f: &mut Formatter<'_>) -> std::fmt::Result {
+    writeln!(f, "{e}\n")?;
+    let mut current = e.source();
+    while let Some(cause) = current {
+        writeln!(f, "Caused by:\n\t{cause}")?;
+        current = cause.source();
+    }
+    Ok(())
+}
+
+impl Debug for StoreTokenError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
     }
 }
 
