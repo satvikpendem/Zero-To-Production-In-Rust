@@ -197,7 +197,6 @@ pub async fn store_token(
     Ok(())
 }
 
-#[derive(Debug)]
 pub enum SubscribeError {
     ValidationError(String),
     DatabaseError(sqlx::Error),
@@ -205,9 +204,36 @@ pub enum SubscribeError {
     SendEmailError(reqwest::Error),
 }
 
+impl Debug for SubscribeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
 impl Display for SubscribeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Failed to create new subscriber.")
+        match self {
+            Self::ValidationError(e) => write!(f, "{e}"),
+            Self::DatabaseError(_) => write!(f, "???"),
+            Self::StoreTokenError(_) => write!(
+                f,
+                "Failed to store the confirmation token for a new subscriber."
+            ),
+            Self::SendEmailError(_) => {
+                write!(f, "Failed to send a confirmation email.")
+            }
+        }
+    }
+}
+
+impl Error for SubscribeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::ValidationError(_) => None,
+            Self::DatabaseError(e) => Some(e),
+            Self::StoreTokenError(e) => Some(e),
+            Self::SendEmailError(e) => Some(e),
+        }
     }
 }
 
